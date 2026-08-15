@@ -481,6 +481,6 @@ https://github.com/rakshachahar/anonymous-safety-intelligence-system
 
 ## 📄 License
 
-This project is available for educational and development purposes.
+This project is licensed under the MIT License.
 
-The repository includes an MIT License.
+See the [LICENSE](LICENSE) file for details.
