@@ -98,21 +98,15 @@ export default function Dashboard() {
             .order('created_at', { ascending: false }),
         ]);
 
-      if (reportsRes.error) {
-        console.error('Reports error:', reportsRes.error);
-      } else {
+      if (!reportsRes.error) {
         setReports(reportsRes.data || []);
-      }
+}
 
-      if (alertsRes.error) {
-        console.error('Alerts error:', alertsRes.error);
-      } else {
+      if (!alertsRes.error) {
         setAlerts(alertsRes.data || []);
       }
 
       if (safeZonesRes.error) {
-        console.error('Safe zones error:', safeZonesRes.error);
-      } else {
         setSafeZones(safeZonesRes.data || []);
       }
 

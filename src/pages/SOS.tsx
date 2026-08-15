@@ -22,48 +22,18 @@ interface Contact {
   is_primary: boolean;
 }
 
-const defaultContacts: Contact[] = [
-  {
-    id: '1',
-    name: 'Emergency Services',
-    phone: '100',
-    relationship: 'Police',
-    is_primary: true,
-  },
-  {
-    id: '2',
-    name: 'Women Helpline',
-    phone: '1091',
-    relationship: 'Helpline',
-    is_primary: true,
-  },
-  {
-    id: '3',
-    name: 'Mom',
-    phone: '+91-98765-43210',
-    relationship: 'Family',
-    is_primary: false,
-  },
-  {
-    id: '4',
-    name: 'Priya (Friend)',
-    phone: '+91-91234-56789',
-    relationship: 'Friend',
-    is_primary: false,
-  },
-];
-
 export default function SOS() {
   const [sosActive, setSosActive] = useState(false);
   const [sosSent, setSosSent] = useState(false);
   const [sosError, setSosError] = useState('');
-  const [contacts, setContacts] = useState<Contact[]>(defaultContacts);
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [showAddContact, setShowAddContact] = useState(false);
   const [newContact, setNewContact] = useState({
     name: '',
     phone: '',
     relationship: '',
   });
+
   const [countdown, setCountdown] = useState<number | null>(null);
   const [location, setLocation] = useState<{
     lat: number;
@@ -71,53 +41,35 @@ export default function SOS() {
   } | null>(null);
 
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setLocation({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-          });
-        },
-        () => {
-          setLocation({
-            lat: 28.6139,
-            lng: 77.209,
-          });
-        }
-      );
-    } else {
-      setLocation({
-        lat: 28.6139,
-        lng: 77.209,
-      });
-    }
+    if (!navigator.geolocation) return;
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocation({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        });
+      },
+      () => {
+        setLocation(null);
+      }
+    );
   }, []);
 
   useEffect(() => {
     async function fetchContacts() {
-      try {
-        const { data, error } = await supabase
-          .from('trusted_contacts')
-          .select('*')
-          .limit(10);
+      const { data } = await supabase
+        .from('trusted_contacts')
+        .select('*')
+        .limit(10);
 
-        if (error) {
-          console.error('Trusted contacts error:', error);
-          return;
-        }
-
-        if (data?.length) {
-          setContacts([
-            ...defaultContacts,
-            ...data.map((d) => ({
-              ...d,
-              is_primary: false,
-            })),
-          ]);
-        }
-      } catch (error) {
-        console.error('Trusted contacts error:', error);
+      if (data?.length) {
+        setContacts(
+          data.map((contact) => ({
+            ...contact,
+            is_primary: false,
+          }))
+        );
       }
     }
 
@@ -145,21 +97,17 @@ export default function SOS() {
   };
 
   const triggerSOS = async () => {
-    const latitude = location?.lat ?? 28.6139;
-    const longitude = location?.lng ?? 77.209;
-
     try {
       const { error } = await supabase.from('sos_events').insert({
         user_id: null,
-        latitude,
-        longitude,
-        location_name: 'Current Location',
+        latitude: location?.lat ?? null,
+        longitude: location?.lng ?? null,
+        location_name: location ? 'Current Location' : null,
         status: 'active',
         contacts_notified: contacts.length,
       });
 
       if (error) {
-        console.error('SOS insert error:', error);
         setSosError(error.message);
         setSosActive(false);
         return;
@@ -168,7 +116,6 @@ export default function SOS() {
       setSosSent(true);
       setSosActive(false);
     } catch (error) {
-      console.error('SOS error:', error);
       setSosError(
         error instanceof Error
           ? error.message
@@ -225,7 +172,7 @@ export default function SOS() {
         </h1>
 
         <p className="text-sm text-slate-500 mt-1">
-          One tap to alert your trusted contacts and emergency services
+          One tap to record an emergency alert and share available location data
         </p>
       </div>
 
@@ -237,13 +184,13 @@ export default function SOS() {
           background: sosActive
             ? 'linear-gradient(135deg, rgba(244,63,94,0.15), rgba(236,72,153,0.1))'
             : sosSent
-            ? 'linear-gradient(135deg, rgba(52,211,153,0.1), rgba(16,185,129,0.05))'
-            : undefined,
+              ? 'linear-gradient(135deg, rgba(52,211,153,0.1), rgba(16,185,129,0.05))'
+              : undefined,
           border: sosActive
             ? '1px solid rgba(244,63,94,0.3)'
             : sosSent
-            ? '1px solid rgba(52,211,153,0.2)'
-            : undefined,
+              ? '1px solid rgba(52,211,153,0.2)'
+              : undefined,
         }}
       >
         <AnimatePresence mode="wait">
@@ -314,7 +261,7 @@ export default function SOS() {
 
               {!sosActive && (
                 <p className="mt-6 text-sm text-slate-500">
-                  Press and hold to send emergency alert
+                  Press to send emergency alert
                 </p>
               )}
 
@@ -349,7 +296,8 @@ export default function SOS() {
               </h2>
 
               <p className="text-sm text-slate-400 text-center max-w-sm">
-                Emergency alert has been recorded for {contacts.length} contacts.
+                Emergency alert has been recorded for {contacts.length} trusted
+                contacts.
               </p>
 
               <div className="flex items-center gap-2 mt-4 text-xs text-slate-500">
@@ -357,7 +305,7 @@ export default function SOS() {
                 Location shared:{' '}
                 {location
                   ? `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`
-                  : 'Acquiring...'}
+                  : 'Location unavailable'}
               </div>
 
               <button
@@ -520,50 +468,56 @@ export default function SOS() {
         </AnimatePresence>
 
         <div className="space-y-2">
-          {contacts.map((contact, i) => (
-            <motion.div
-              key={contact.id}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1 * i }}
-              className="flex items-center gap-4 p-3 rounded-xl hover:bg-violet-500/5 transition-colors group"
-            >
-              <div
-                className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-semibold"
-                style={{
-                  background: contact.is_primary
-                    ? 'linear-gradient(135deg, #F43F5E, #EC4899)'
-                    : 'linear-gradient(135deg, #8B5CF6, #A855F7)',
-                }}
+          {contacts.length === 0 ? (
+            <p className="text-sm text-slate-500 text-center py-4">
+              No trusted contacts added yet.
+            </p>
+          ) : (
+            contacts.map((contact, i) => (
+              <motion.div
+                key={contact.id}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1 * i }}
+                className="flex items-center gap-4 p-3 rounded-xl hover:bg-violet-500/5 transition-colors group"
               >
-                {contact.name.charAt(0)}
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-200 truncate">
-                  {contact.name}
-                </p>
-                <p className="text-xs text-slate-500">
-                  {contact.phone} - {contact.relationship}
-                </p>
-              </div>
-
-              {contact.is_primary && (
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md text-rose-400 bg-rose-500/10 border border-rose-500/20">
-                  Emergency
-                </span>
-              )}
-
-              {!contact.is_primary && (
-                <button
-                  onClick={() => handleRemoveContact(contact.id)}
-                  className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-rose-500/10 transition-all"
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-semibold"
+                  style={{
+                    background: contact.is_primary
+                      ? 'linear-gradient(135deg, #F43F5E, #EC4899)'
+                      : 'linear-gradient(135deg, #8B5CF6, #A855F7)',
+                  }}
                 >
-                  <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-                </button>
-              )}
-            </motion.div>
-          ))}
+                  {contact.name.charAt(0)}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-200 truncate">
+                    {contact.name}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {contact.phone} - {contact.relationship}
+                  </p>
+                </div>
+
+                {contact.is_primary && (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md text-rose-400 bg-rose-500/10 border border-rose-500/20">
+                    Emergency
+                  </span>
+                )}
+
+                {!contact.is_primary && (
+                  <button
+                    onClick={() => handleRemoveContact(contact.id)}
+                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-rose-500/10 transition-all"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                  </button>
+                )}
+              </motion.div>
+            ))
+          )}
         </div>
       </motion.div>
 
@@ -595,9 +549,7 @@ export default function SOS() {
               style={{ background: 'rgba(139,92,246,0.03)' }}
             >
               <Shield className="w-4 h-4 text-violet-400/60 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-slate-400 leading-relaxed">
-                {tip}
-              </p>
+              <p className="text-xs text-slate-400 leading-relaxed">{tip}</p>
             </div>
           ))}
         </div>

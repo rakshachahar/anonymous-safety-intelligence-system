@@ -85,16 +85,13 @@ export default function Admin() {
   const fetchReports = async () => {
     setLoading(true);
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('safety_reports')
       .select('*')
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('ADMIN REPORT FETCH ERROR:', error);
       setReports([]);
-    } else {
-      setReports(data || []);
     }
 
     setLoading(false);
@@ -114,7 +111,6 @@ export default function Admin() {
       .eq('id', reportId);
 
     if (error) {
-      console.error('STATUS UPDATE ERROR:', error);
       alert(`Could not update report: ${error.message}`);
       return;
     }

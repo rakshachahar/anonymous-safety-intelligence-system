@@ -40,7 +40,6 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
     const { error } = await supabase.auth.signOut();
 
     if (error) {
-      console.error('Logout error:', error);
       return;
     }
 

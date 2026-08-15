@@ -87,19 +87,16 @@ export default function Heatmap() {
             .order('created_at', { ascending: false }),
         ]);
 
-        if (reportsRes.error) {
-          console.error('Heatmap reports error:', reportsRes.error);
-        } else {
+        if (!reportsRes.error) {
           setReports(reportsRes.data || []);
         }
 
-        if (alertsRes.error) {
-          console.error('Heatmap alerts error:', alertsRes.error);
-        } else {
+        if (!alertsRes.error) {
           setAlerts(alertsRes.data || []);
         }
-      } catch (error) {
-        console.error('Heatmap fetch error:', error);
+      } catch {
+        setReports([]);
+        setAlerts([]);
       }
     }
 

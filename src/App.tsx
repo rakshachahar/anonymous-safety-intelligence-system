@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import Layout from './components/Layout';
 import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
@@ -10,17 +11,19 @@ import Report from './pages/Report';
 import Settings from './pages/Settings';
 import Help from './pages/Help';
 import { supabase } from './lib/supabase';
-import { useEffect, useState } from 'react';
+
+const ADMIN_EMAIL = 'admin.safevoice@gmail.com';
 
 function ProtectedAdmin() {
   const [checking, setChecking] = useState(true);
-  const [authenticated, setAuthenticated] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     async function checkAdmin() {
       const { data } = await supabase.auth.getSession();
+      const email = data.session?.user?.email?.toLowerCase();
 
-      setAuthenticated(!!data.session);
+      setIsAdmin(email === ADMIN_EMAIL);
       setChecking(false);
     }
 
@@ -29,7 +32,8 @@ function ProtectedAdmin() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setAuthenticated(!!session);
+      const email = session?.user?.email?.toLowerCase();
+      setIsAdmin(email === ADMIN_EMAIL);
       setChecking(false);
     });
 
@@ -44,7 +48,7 @@ function ProtectedAdmin() {
     );
   }
 
-  if (!authenticated) {
+  if (!isAdmin) {
     return <Navigate to="/admin-login" replace />;
   }
 

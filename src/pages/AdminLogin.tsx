@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
+const ADMIN_EMAIL = 'admin.safevoice@gmail.com';
+
 export default function AdminLogin() {
   const navigate = useNavigate();
 
@@ -16,8 +18,16 @@ export default function AdminLogin() {
     setLoading(true);
     setError('');
 
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (normalizedEmail !== ADMIN_EMAIL) {
+      setError('Invalid admin email or password.');
+      setLoading(false);
+      return;
+    }
+
     const { error } = await supabase.auth.signInWithPassword({
-      email,
+      email: normalizedEmail,
       password,
     });
 

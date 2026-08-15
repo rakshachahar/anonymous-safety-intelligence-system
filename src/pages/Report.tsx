@@ -102,8 +102,7 @@ export default function Report() {
 
         setLocating(false);
       },
-      (error) => {
-        console.error('LOCATION ERROR:', error);
+      () => {
         alert(
           'Unable to access your location. You can enter a location name manually.'
         );
@@ -153,8 +152,7 @@ export default function Report() {
           result.address?.state ||
           '',
       };
-    } catch (error) {
-      console.error('GEOCODING ERROR:', error);
+    } catch {
       return null;
     }
   };
@@ -215,7 +213,7 @@ export default function Report() {
         zone = zone || location.zone;
       }
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('safety_reports')
         .insert({
           category: form.category,
@@ -240,17 +238,13 @@ export default function Report() {
         })
         .select();
 
-      console.log('SUPABASE DATA:', data);
-      console.log('SUPABASE ERROR:', error);
-
       if (error) {
         alert(`Database error: ${error.message}`);
         return;
       }
 
       setSubmitted(true);
-    } catch (error) {
-      console.error('SUBMIT ERROR:', error);
+    } catch {
       alert('Unexpected error while submitting the report.');
     }
   };
