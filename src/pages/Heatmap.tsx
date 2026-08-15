@@ -9,13 +9,25 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
+interface SafetyReport {
+  id: string;
+  category: string;
+  severity: string;
+  latitude: number;
+  longitude: number;
+  location_name: string;
+  zone: string;
+  created_at: string;
+}
+
 interface HeatmapPoint {
   id: string;
-  grid_lat: number;
-  grid_lng: number;
+  latitude: number;
+  longitude: number;
   risk_score: number;
-  incident_count: number;
   category: string;
+  location_name: string;
+  zone: string;
 }
 
 interface Alert {
@@ -41,9 +53,16 @@ const severityColors: Record<string, string> = {
   low: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
 };
 
+const severityScore: Record<string, number> = {
+  critical: 0.95,
+  high: 0.8,
+  medium: 0.6,
+  low: 0.3,
+};
+
 export default function Heatmap() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [heatmapData, setHeatmapData] = useState<HeatmapPoint[]>([]);
+  const [reports, setReports] = useState<SafetyReport[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [selectedPoint, setSelectedPoint] = useState<HeatmapPoint | null>(null);
   const [filter, setFilter] = useState('all');
@@ -53,106 +72,186 @@ export default function Heatmap() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [heatmapRes, alertsRes] = await Promise.all([
-          supabase.from('heatmap_data').select('*').eq('period', 'monthly'),
-          supabase.from('alerts').select('*').eq('is_active', true).order('created_at', { ascending: false }),
+        const [reportsRes, alertsRes] = await Promise.all([
+          supabase
+            .from('safety_reports')
+            .select(
+              'id, category, severity, latitude, longitude, location_name, zone, created_at'
+            )
+            .order('created_at', { ascending: false }),
+
+          supabase
+            .from('alerts')
+            .select('*')
+            .eq('is_active', true)
+            .order('created_at', { ascending: false }),
         ]);
-        if (heatmapRes.data?.length) setHeatmapData(heatmapRes.data);
-        if (alertsRes.data?.length) setAlerts(alertsRes.data);
-      } catch {
-        // fallback
+
+        if (reportsRes.error) {
+          console.error('Heatmap reports error:', reportsRes.error);
+        } else {
+          setReports(reportsRes.data || []);
+        }
+
+        if (alertsRes.error) {
+          console.error('Heatmap alerts error:', alertsRes.error);
+        } else {
+          setAlerts(alertsRes.data || []);
+        }
+      } catch (error) {
+        console.error('Heatmap fetch error:', error);
       }
     }
+
     fetchData();
   }, []);
 
-  // Fallback data
-  const points = heatmapData.length ? heatmapData : [
-    { id: '1', grid_lat: 28.6139, grid_lng: 77.2090, risk_score: 0.82, incident_count: 15, category: 'harassment' },
-    { id: '2', grid_lat: 28.6320, grid_lng: 77.2180, risk_score: 0.94, incident_count: 8, category: 'stalking' },
-    { id: '3', grid_lat: 28.5672, grid_lng: 77.3210, risk_score: 0.65, incident_count: 12, category: 'harassment' },
-    { id: '4', grid_lat: 28.6350, grid_lng: 77.2250, risk_score: 0.97, incident_count: 5, category: 'assault' },
-    { id: '5', grid_lat: 28.6508, grid_lng: 77.2330, risk_score: 0.78, incident_count: 9, category: 'harassment' },
-    { id: '6', grid_lat: 28.6100, grid_lng: 77.2400, risk_score: 0.85, incident_count: 7, category: 'stalking' },
-    { id: '7', grid_lat: 28.5700, grid_lng: 77.3200, risk_score: 0.76, incident_count: 4, category: 'harassment' },
-    { id: '8', grid_lat: 28.6280, grid_lng: 77.2170, risk_score: 0.58, incident_count: 3, category: 'voyeurism' },
-    { id: '9', grid_lat: 28.5480, grid_lng: 77.2700, risk_score: 0.71, incident_count: 6, category: 'harassment' },
-    { id: '10', grid_lat: 28.4089, grid_lng: 77.3120, risk_score: 0.91, incident_count: 4, category: 'stalking' },
-    { id: '11', grid_lat: 28.6800, grid_lng: 77.2100, risk_score: 0.55, incident_count: 5, category: 'harassment' },
-    { id: '12', grid_lat: 28.6300, grid_lng: 77.1950, risk_score: 0.89, incident_count: 7, category: 'assault' },
-    { id: '13', grid_lat: 28.6150, grid_lng: 77.2300, risk_score: 0.48, incident_count: 3, category: 'harassment' },
-    { id: '14', grid_lat: 28.5600, grid_lng: 77.3100, risk_score: 0.79, incident_count: 5, category: 'stalking' },
-    { id: '15', grid_lat: 28.6200, grid_lng: 77.2500, risk_score: 0.62, incident_count: 4, category: 'harassment' },
-  ];
+  /*
+    Only reports with real coordinates are plotted.
 
-  const alertList = alerts.length ? alerts : [
-    { id: '1', title: 'High Risk Zone: Connaught Place', zone: 'Central Delhi', risk_level: 'critical', description: 'Multiple harassment reports', created_at: new Date().toISOString() },
-    { id: '2', title: 'Stalking Pattern: Rajiv Chowk', zone: 'Central Delhi', risk_level: 'critical', description: 'AI detected serial pattern', created_at: new Date().toISOString() },
-    { id: '3', title: 'Moderate Risk: Sector 18', zone: 'Noida', risk_level: 'high', description: 'Elevated evening incidents', created_at: new Date().toISOString() },
-    { id: '4', title: 'Patrol Active: India Gate', zone: 'Central Delhi', risk_level: 'high', description: 'Police patrol deployed', created_at: new Date().toISOString() },
-    { id: '5', title: 'New Pattern: Expressway', zone: 'Noida-GN', risk_level: 'critical', description: 'Vehicle stalking increasing', created_at: new Date().toISOString() },
-  ];
+    Reports where latitude/longitude are 0 are still stored in Supabase,
+    but cannot be placed accurately on the geographic visualization.
+  */
+  const points: HeatmapPoint[] = reports
+    .filter(
+      report =>
+        Number.isFinite(Number(report.latitude)) &&
+        Number.isFinite(Number(report.longitude)) &&
+        Number(report.latitude) !== 0 &&
+        Number(report.longitude) !== 0
+    )
+    .map(report => ({
+      id: report.id,
+      latitude: Number(report.latitude),
+      longitude: Number(report.longitude),
+      risk_score: severityScore[report.severity?.toLowerCase()] ?? 0.5,
+      category: report.category || 'other',
+      location_name:
+        report.location_name || report.zone || 'Unknown location',
+      zone: report.zone || '',
+    }));
 
-  // Draw cyber-intelligence map
+  const filteredPoints =
+    filter === 'all'
+      ? points
+      : points.filter(
+          point => point.category.toLowerCase() === filter.toLowerCase()
+        );
+
+  const reportsWithLocation = points.length;
+  const reportsWithoutLocation = reports.length - reportsWithLocation;
+
+  const criticalZones = alerts.filter(
+    alert => alert.risk_level === 'critical'
+  ).length;
+
+  const highRiskZones = alerts.filter(
+    alert => alert.risk_level === 'high'
+  ).length;
+
+  const mediumRiskZones = alerts.filter(
+    alert => alert.risk_level === 'medium'
+  ).length;
+
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+
+    if (!canvas || filteredPoints.length === 0) {
+      return;
+    }
+
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+
+    if (!ctx) {
+      return;
+    }
 
     const resize = () => {
       const rect = canvas.parentElement?.getBoundingClientRect();
-      if (rect) {
-        canvas.width = rect.width;
-        canvas.height = rect.height;
-      }
+
+      if (!rect) return;
+
+      const dpr = window.devicePixelRatio || 1;
+
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+
+      canvas.style.width = `${rect.width}px`;
+      canvas.style.height = `${rect.height}px`;
+
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
+
     resize();
     window.addEventListener('resize', resize);
 
-    const filteredPoints = filter === 'all' ? points : points.filter(p => p.category === filter);
-
     const animate = () => {
-      timeRef.current += 0.01;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const rect = canvas.parentElement?.getBoundingClientRect();
 
-      // Dark grid background
+      if (!rect) return;
+
+      const width = rect.width;
+      const height = rect.height;
+
+      timeRef.current += 0.01;
+
+      ctx.clearRect(0, 0, width, height);
+
+      // Background grid
       ctx.strokeStyle = 'rgba(139, 92, 246, 0.04)';
       ctx.lineWidth = 1;
+
       const gridSize = 40;
-      for (let x = 0; x < canvas.width; x += gridSize) {
+
+      for (let x = 0; x < width; x += gridSize) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
-      }
-      for (let y = 0; y < canvas.height; y += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
+        ctx.lineTo(x, height);
         ctx.stroke();
       }
 
-      // Map lat/lng to canvas
-      const lats = filteredPoints.map(p => p.grid_lat);
-      const lngs = filteredPoints.map(p => p.grid_lng);
+      for (let y = 0; y < height; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+
+      const lats = filteredPoints.map(point => point.latitude);
+      const lngs = filteredPoints.map(point => point.longitude);
+
       const minLat = Math.min(...lats) - 0.02;
       const maxLat = Math.max(...lats) + 0.02;
       const minLng = Math.min(...lngs) - 0.02;
       const maxLng = Math.max(...lngs) + 0.02;
 
-      const toX = (lng: number) => ((lng - minLng) / (maxLng - minLng)) * (canvas.width - 80) + 40;
-      const toY = (lat: number) => ((maxLat - lat) / (maxLat - minLat)) * (canvas.height - 80) + 40;
+      const latRange = maxLat - minLat || 1;
+      const lngRange = maxLng - minLng || 1;
 
-      // Draw heatmap zones (glowing circles)
-      filteredPoints.forEach((point) => {
-        const x = toX(point.grid_lng);
-        const y = toY(point.grid_lat);
+      const toX = (lng: number) =>
+        ((lng - minLng) / lngRange) * (width - 80) + 40;
+
+      const toY = (lat: number) =>
+        ((maxLat - lat) / latRange) * (height - 80) + 40;
+
+      filteredPoints.forEach(point => {
+        const x = toX(point.longitude);
+        const y = toY(point.latitude);
+
         const radius = 30 + point.risk_score * 40;
-        const pulse = Math.sin(timeRef.current * 2 + point.risk_score * 10) * 5;
 
-        // Outer glow
-        const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius + pulse);
+        const pulse =
+          Math.sin(timeRef.current * 2 + point.risk_score * 10) * 5;
+
+        const gradient = ctx.createRadialGradient(
+          x,
+          y,
+          0,
+          x,
+          y,
+          radius + pulse
+        );
+
         if (point.risk_score > 0.8) {
           gradient.addColorStop(0, 'rgba(244, 63, 94, 0.3)');
           gradient.addColorStop(0.5, 'rgba(244, 63, 94, 0.1)');
@@ -166,49 +265,47 @@ export default function Heatmap() {
           gradient.addColorStop(0.5, 'rgba(251, 191, 36, 0.06)');
           gradient.addColorStop(1, 'rgba(251, 191, 36, 0)');
         }
+
         ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.arc(x, y, radius + pulse, 0, Math.PI * 2);
         ctx.fill();
 
-        // Center dot
-        const dotColor = point.risk_score > 0.8 ? '#F43F5E' : point.risk_score > 0.6 ? '#F97316' : '#FBBF24';
+        const dotColor =
+          point.risk_score > 0.8
+            ? '#F43F5E'
+            : point.risk_score > 0.6
+              ? '#F97316'
+              : '#FBBF24';
+
         ctx.fillStyle = dotColor;
         ctx.beginPath();
-        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.arc(x, y, 5, 0, Math.PI * 2);
         ctx.fill();
 
-        // Pulse ring
-        const ringRadius = 8 + (Math.sin(timeRef.current * 3 + point.risk_score * 5) + 1) * 8;
+        const ringRadius =
+          8 +
+          (Math.sin(timeRef.current * 3 + point.risk_score * 5) + 1) * 8;
+
         ctx.strokeStyle = dotColor;
         ctx.globalAlpha = 0.3 - (ringRadius - 8) / 40;
         ctx.lineWidth = 1.5;
+
         ctx.beginPath();
         ctx.arc(x, y, ringRadius, 0, Math.PI * 2);
         ctx.stroke();
+
         ctx.globalAlpha = 1;
 
-        // Label
-        ctx.fillStyle = 'rgba(148, 163, 184, 0.6)';
+        ctx.fillStyle = 'rgba(148, 163, 184, 0.8)';
         ctx.font = '10px Inter';
         ctx.textAlign = 'center';
-        ctx.fillText(`${(point.risk_score * 100).toFixed(0)}%`, x, y - 12);
-      });
 
-      // Draw connections between nearby high-risk points
-      ctx.strokeStyle = 'rgba(139, 92, 246, 0.08)';
-      ctx.lineWidth = 0.5;
-      filteredPoints.forEach((p1, i) => {
-        filteredPoints.forEach((p2, j) => {
-          if (j <= i) return;
-          const dist = Math.sqrt(Math.pow(p1.grid_lat - p2.grid_lat, 2) + Math.pow(p1.grid_lng - p2.grid_lng, 2));
-          if (dist < 0.05 && p1.risk_score > 0.7 && p2.risk_score > 0.7) {
-            ctx.beginPath();
-            ctx.moveTo(toX(p1.grid_lng), toY(p1.grid_lat));
-            ctx.lineTo(toX(p2.grid_lng), toY(p2.grid_lat));
-            ctx.stroke();
-          }
-        });
+        ctx.fillText(
+          `${Math.round(point.risk_score * 100)}%`,
+          x,
+          y - 14
+        );
       });
 
       animRef.current = requestAnimationFrame(animate);
@@ -220,102 +317,159 @@ export default function Heatmap() {
       window.removeEventListener('resize', resize);
       cancelAnimationFrame(animRef.current);
     };
-  }, [points, filter]);
+  }, [filteredPoints]);
 
-  // Handle canvas click
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleCanvasClick = (
+    event: React.MouseEvent<HTMLCanvasElement>
+  ) => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
 
-    const lats = points.map(p => p.grid_lat);
-    const lngs = points.map(p => p.grid_lng);
+    if (!canvas || filteredPoints.length === 0) return;
+
+    const rect = canvas.getBoundingClientRect();
+
+    const clickX = event.clientX - rect.left;
+    const clickY = event.clientY - rect.top;
+
+    const lats = filteredPoints.map(point => point.latitude);
+    const lngs = filteredPoints.map(point => point.longitude);
+
     const minLat = Math.min(...lats) - 0.02;
     const maxLat = Math.max(...lats) + 0.02;
     const minLng = Math.min(...lngs) - 0.02;
     const maxLng = Math.max(...lngs) + 0.02;
 
-    const toX = (lng: number) => ((lng - minLng) / (maxLng - minLng)) * (canvas.width - 80) + 40;
-    const toY = (lat: number) => ((maxLat - lat) / (maxLat - minLat)) * (canvas.height - 80) + 40;
+    const latRange = maxLat - minLat || 1;
+    const lngRange = maxLng - minLng || 1;
 
-    const filteredPoints = filter === 'all' ? points : points.filter(p => p.category === filter);
+    const toX = (lng: number) =>
+      ((lng - minLng) / lngRange) * (rect.width - 80) + 40;
+
+    const toY = (lat: number) =>
+      ((maxLat - lat) / latRange) * (rect.height - 80) + 40;
 
     for (const point of filteredPoints) {
-      const px = toX(point.grid_lng);
-      const py = toY(point.grid_lat);
-      const dist = Math.sqrt(Math.pow(clickX - px, 2) + Math.pow(clickY - py, 2));
-      if (dist < 30) {
+      const x = toX(point.longitude);
+      const y = toY(point.latitude);
+
+      const distance = Math.sqrt(
+        Math.pow(clickX - x, 2) + Math.pow(clickY - y, 2)
+      );
+
+      if (distance < 35) {
         setSelectedPoint(point);
         return;
       }
     }
+
     setSelectedPoint(null);
   };
 
   return (
     <div className="space-y-6">
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100 tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+          <h1
+            className="text-2xl font-bold text-slate-100 tracking-tight"
+            style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+          >
             Risk <span className="gradient-text">Heatmap</span>
           </h1>
-          <p className="text-sm text-slate-500 mt-1">Cyber-intelligence risk visualization with real-time threat mapping</p>
+
+          <p className="text-sm text-slate-500 mt-1">
+            Safety risk visualization from stored community reports
+          </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(139,92,246,0.15)' }}>
-            {['all', 'harassment', 'stalking', 'assault'].map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize ${
-                  filter === f ? 'text-white' : 'text-slate-500 hover:text-slate-300'
-                }`}
-                style={filter === f ? { background: 'linear-gradient(135deg, #8B5CF6, #EC4899)' } : {}}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
+
+        <div
+          className="flex items-center gap-1 p-1 rounded-xl"
+          style={{
+            background: 'rgba(15,23,42,0.6)',
+            border: '1px solid rgba(139,92,246,0.15)',
+          }}
+        >
+          {['all', 'harassment', 'stalking', 'assault'].map(item => (
+            <button
+              key={item}
+              onClick={() => setFilter(item)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize ${
+                filter === item
+                  ? 'text-white'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
+              style={
+                filter === item
+                  ? {
+                      background:
+                        'linear-gradient(135deg, #8B5CF6, #EC4899)',
+                    }
+                  : {}
+              }
+            >
+              {item}
+            </button>
+          ))}
         </div>
       </div>
 
+      {/* Main layout */}
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
+
         {/* Map */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="xl:col-span-3 glass-card overflow-hidden relative"
-          style={{ minHeight: '500px' }}
         >
+
           {/* Map controls */}
           <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
-            <button className="w-9 h-9 rounded-lg flex items-center justify-center glass-card hover:border-violet-500/30 transition-colors">
+            <button
+              className="w-9 h-9 rounded-lg flex items-center justify-center glass-card"
+              title="Location view"
+            >
               <Crosshair className="w-4 h-4 text-violet-400" />
             </button>
-            <button className="w-9 h-9 rounded-lg flex items-center justify-center glass-card hover:border-violet-500/30 transition-colors">
+
+            <button
+              className="w-9 h-9 rounded-lg flex items-center justify-center glass-card"
+              title="Layers"
+            >
               <Layers className="w-4 h-4 text-violet-400" />
             </button>
-            <button className="w-9 h-9 rounded-lg flex items-center justify-center glass-card hover:border-violet-500/30 transition-colors">
+
+            <button
+              className="w-9 h-9 rounded-lg flex items-center justify-center glass-card"
+              title="Filter"
+            >
               <Filter className="w-4 h-4 text-violet-400" />
             </button>
           </div>
 
           {/* Legend */}
           <div className="absolute top-4 right-4 z-10 glass-card p-3">
-            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Risk Level</p>
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">
+              Risk Level
+            </p>
+
             <div className="space-y-1.5">
               {[
-                { label: 'Critical', color: '#F43F5E' },
-                { label: 'High', color: '#F97316' },
-                { label: 'Medium', color: '#FBBF24' },
-                { label: 'Low', color: '#34D399' },
-              ].map((item) => (
-                <div key={item.label} className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color, boxShadow: `0 0 6px ${item.color}50` }} />
-                  <span className="text-[10px] text-slate-400">{item.label}</span>
+                ['Critical', '#F43F5E'],
+                ['High', '#F97316'],
+                ['Medium', '#FBBF24'],
+                ['Low', '#34D399'],
+              ].map(([label, color]) => (
+                <div key={label} className="flex items-center gap-2">
+                  <span
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={{ backgroundColor: color }}
+                  />
+
+                  <span className="text-[10px] text-slate-400">
+                    {label}
+                  </span>
                 </div>
               ))}
             </div>
@@ -323,6 +477,22 @@ export default function Heatmap() {
 
           {/* Canvas */}
           <div className="w-full h-[500px] relative">
+            {filteredPoints.length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center text-center z-10">
+                <div>
+                  <MapPin className="w-8 h-8 text-slate-600 mx-auto mb-3" />
+
+                  <p className="text-sm text-slate-400">
+                    No mapped reports for this filter
+                  </p>
+
+                  <p className="text-xs text-slate-600 mt-1">
+                    Reports need valid latitude and longitude coordinates.
+                  </p>
+                </div>
+              </div>
+            )}
+
             <canvas
               ref={canvasRef}
               className="w-full h-full cursor-crosshair"
@@ -330,100 +500,243 @@ export default function Heatmap() {
             />
           </div>
 
-          {/* Selected point detail */}
+          {/* Selected report */}
           {selectedPoint && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               className="absolute bottom-4 left-4 z-10 glass-card p-4 w-72"
-              style={{ background: 'rgba(7, 2, 15, 0.9)' }}
+              style={{ background: 'rgba(7, 2, 15, 0.92)' }}
             >
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-semibold text-slate-200 capitalize">{selectedPoint.category}</span>
-                <button onClick={() => setSelectedPoint(null)} className="text-slate-500 hover:text-slate-300 text-xs">Close</button>
+                <span className="text-sm font-semibold text-slate-200 capitalize">
+                  {selectedPoint.category}
+                </span>
+
+                <button
+                  onClick={() => setSelectedPoint(null)}
+                  className="text-slate-500 hover:text-slate-300 text-xs"
+                >
+                  Close
+                </button>
               </div>
+
               <div className="space-y-2">
+
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-500">Risk Score</span>
-                  <span className="text-sm font-bold" style={{ color: selectedPoint.risk_score > 0.8 ? '#F43F5E' : selectedPoint.risk_score > 0.6 ? '#F97316' : '#FBBF24' }}>
-                    {(selectedPoint.risk_score * 100).toFixed(0)}%
+                  <span className="text-xs text-slate-500">
+                    Risk Score
+                  </span>
+
+                  <span
+                    className="text-sm font-bold"
+                    style={{
+                      color:
+                        selectedPoint.risk_score > 0.8
+                          ? '#F43F5E'
+                          : selectedPoint.risk_score > 0.6
+                            ? '#F97316'
+                            : '#FBBF24',
+                    }}
+                  >
+                    {Math.round(selectedPoint.risk_score * 100)}%
                   </span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-500">Incidents</span>
-                  <span className="text-sm font-semibold text-slate-200">{selectedPoint.incident_count}</span>
+
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs text-slate-500">
+                    Location
+                  </span>
+
+                  <span className="text-xs text-slate-400 text-right">
+                    {selectedPoint.location_name}
+                  </span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-500">Coordinates</span>
-                  <span className="text-xs text-slate-400">{selectedPoint.grid_lat.toFixed(4)}, {selectedPoint.grid_lng.toFixed(4)}</span>
+
+                {selectedPoint.zone && (
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs text-slate-500">
+                      Zone
+                    </span>
+
+                    <span className="text-xs text-slate-400 text-right">
+                      {selectedPoint.zone}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs text-slate-500">
+                    Coordinates
+                  </span>
+
+                  <span className="text-xs text-slate-400">
+                    {selectedPoint.latitude.toFixed(4)},{' '}
+                    {selectedPoint.longitude.toFixed(4)}
+                  </span>
                 </div>
+
               </div>
             </motion.div>
           )}
         </motion.div>
 
-        {/* Alert sidebar */}
+        {/* Right panel */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
           className="glass-card p-5 space-y-4"
         >
+
+          {/* Active alerts */}
           <div className="flex items-center gap-2">
             <Radio className="w-4 h-4 text-rose-400" />
-            <h2 className="text-sm font-semibold text-slate-200">Active Alerts</h2>
-            <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-rose-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 glow-pulse" />
-              LIVE
+
+            <h2 className="text-sm font-semibold text-slate-200">
+              Active Alerts
+            </h2>
+
+            <span className="ml-auto text-[10px] font-semibold text-rose-400">
+              {alerts.length > 0 ? 'LIVE' : 'NONE'}
             </span>
           </div>
 
           <div className="space-y-3">
-            {alertList.map((alert, i) => (
-              <motion.div
-                key={alert.id}
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.3 + i * 0.1 }}
-                className="p-3 rounded-xl hover:bg-violet-500/5 transition-colors cursor-pointer"
-                style={{ borderLeft: `2px solid ${riskColors[alert.risk_level] || '#8B5CF6'}` }}
-              >
-                <p className="text-xs font-medium text-slate-200 leading-snug">{alert.title}</p>
-                <p className="text-[10px] text-slate-500 mt-1">{alert.description}</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="text-[10px] text-slate-600 flex items-center gap-1">
-                    <MapPin className="w-3 h-3" /> {alert.zone}
-                  </span>
-                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${severityColors[alert.risk_level] || ''}`}>
-                    {alert.risk_level}
-                  </span>
+            {alerts.length === 0 ? (
+              <p className="text-xs text-slate-500">
+                No active safety alerts.
+              </p>
+            ) : (
+              alerts.map(alert => (
+                <div
+                  key={alert.id}
+                  className="p-3 rounded-xl"
+                  style={{
+                    borderLeft: `2px solid ${
+                      riskColors[alert.risk_level] || '#8B5CF6'
+                    }`,
+                  }}
+                >
+                  <p className="text-xs font-medium text-slate-200">
+                    {alert.title}
+                  </p>
+
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    {alert.description}
+                  </p>
+
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-[10px] text-slate-600 flex items-center gap-1">
+                      <MapPin className="w-3 h-3" />
+                      {alert.zone}
+                    </span>
+
+                    <span
+                      className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
+                        severityColors[alert.risk_level] || ''
+                      }`}
+                    >
+                      {alert.risk_level}
+                    </span>
+                  </div>
                 </div>
-              </motion.div>
-            ))}
+              ))
+            )}
           </div>
 
-          {/* Zone stats */}
-          <div className="pt-4 border-t border-violet-500/10 space-y-3">
-            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Zone Summary</h3>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="p-3 rounded-xl text-center" style={{ background: 'rgba(244,63,94,0.05)', border: '1px solid rgba(244,63,94,0.1)' }}>
-                <p className="text-lg font-bold text-rose-400" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>3</p>
-                <p className="text-[10px] text-slate-500">Critical Zones</p>
+          {/* Data status */}
+          <div className="pt-4 border-t border-violet-500/10">
+            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+              Location Coverage
+            </h3>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-500">
+                  Total reports
+                </span>
+
+                <span className="text-sm font-semibold text-slate-200">
+                  {reports.length}
+                </span>
               </div>
-              <div className="p-3 rounded-xl text-center" style={{ background: 'rgba(249,115,22,0.05)', border: '1px solid rgba(249,115,22,0.1)' }}>
-                <p className="text-lg font-bold text-orange-400" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>2</p>
-                <p className="text-[10px] text-slate-500">High Risk</p>
+
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-500">
+                  Mapped reports
+                </span>
+
+                <span className="text-sm font-semibold text-emerald-400">
+                  {reportsWithLocation}
+                </span>
               </div>
-              <div className="p-3 rounded-xl text-center" style={{ background: 'rgba(251,191,36,0.05)', border: '1px solid rgba(251,191,36,0.1)' }}>
-                <p className="text-lg font-bold text-amber-400" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>5</p>
-                <p className="text-[10px] text-slate-500">Medium Risk</p>
-              </div>
-              <div className="p-3 rounded-xl text-center" style={{ background: 'rgba(52,211,153,0.05)', border: '1px solid rgba(52,211,153,0.1)' }}>
-                <p className="text-lg font-bold text-emerald-400" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>8</p>
-                <p className="text-[10px] text-slate-500">Safe Zones</p>
-              </div>
+
+              {reportsWithoutLocation > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-500">
+                    Without coordinates
+                  </span>
+
+                  <span className="text-sm font-semibold text-amber-400">
+                    {reportsWithoutLocation}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Zone summary */}
+          <div className="pt-4 border-t border-violet-500/10 space-y-3">
+            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Alert Summary
+            </h3>
+
+            <div className="grid grid-cols-2 gap-2">
+
+              <div className="p-3 rounded-xl text-center bg-rose-500/5">
+                <p className="text-lg font-bold text-rose-400">
+                  {criticalZones}
+                </p>
+
+                <p className="text-[10px] text-slate-500">
+                  Critical
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl text-center bg-orange-500/5">
+                <p className="text-lg font-bold text-orange-400">
+                  {highRiskZones}
+                </p>
+
+                <p className="text-[10px] text-slate-500">
+                  High Risk
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl text-center bg-amber-500/5">
+                <p className="text-lg font-bold text-amber-400">
+                  {mediumRiskZones}
+                </p>
+
+                <p className="text-[10px] text-slate-500">
+                  Medium
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl text-center bg-emerald-500/5">
+                <p className="text-lg font-bold text-emerald-400">
+                  {points.filter(point => point.risk_score < 0.6).length}
+                </p>
+
+                <p className="text-[10px] text-slate-500">
+                  Lower Risk
+                </p>
+              </div>
+
+            </div>
+          </div>
+
         </motion.div>
       </div>
     </div>

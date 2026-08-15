@@ -5,29 +5,70 @@ import Dashboard from './pages/Dashboard';
 import Heatmap from './pages/Heatmap';
 import SOS from './pages/SOS';
 import Admin from './pages/Admin';
+import AdminLogin from './pages/AdminLogin';
 import Report from './pages/Report';
 import Settings from './pages/Settings';
 import Help from './pages/Help';
+import { supabase } from './lib/supabase';
+import { useEffect, useState } from 'react';
+
+function ProtectedAdmin() {
+  const [checking, setChecking] = useState(true);
+  const [authenticated, setAuthenticated] = useState(false);
+
+  useEffect(() => {
+    async function checkAdmin() {
+      const { data } = await supabase.auth.getSession();
+
+      setAuthenticated(!!data.session);
+      setChecking(false);
+    }
+
+    checkAdmin();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthenticated(!!session);
+      setChecking(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">
+        Checking authentication...
+      </div>
+    );
+  }
+
+  if (!authenticated) {
+    return <Navigate to="/admin-login" replace />;
+  }
+
+  return <Admin />;
+}
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Landing page - standalone */}
         <Route path="/" element={<Landing />} />
 
-        {/* App pages - with sidebar layout */}
+        <Route path="/admin-login" element={<AdminLogin />} />
+
         <Route element={<Layout />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/heatmap" element={<Heatmap />} />
           <Route path="/sos" element={<SOS />} />
-          <Route path="/admin" element={<Admin />} />
+          <Route path="/admin" element={<ProtectedAdmin />} />
           <Route path="/report" element={<Report />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/help" element={<Help />} />
         </Route>
 
-        {/* Catch all */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

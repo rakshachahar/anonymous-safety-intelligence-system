@@ -1,18 +1,15 @@
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
 import {
   ShieldAlert,
   AlertTriangle,
   MapPin,
   Shield,
   Activity,
-  Zap,
   Clock,
   ArrowUpRight,
-  ArrowDownRight,
   Radio,
   Brain,
-  ChevronRight,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -23,8 +20,8 @@ interface SafetyReport {
   severity: string;
   location_name: string;
   zone: string;
-  ai_risk_score: number;
-  ai_insight: string;
+  ai_risk_score: number | null;
+  ai_insight: string | null;
   created_at: string;
   status: string;
 }
@@ -40,11 +37,20 @@ interface Alert {
   created_at: string;
 }
 
-const severityColors: Record<string, string> = {
-  critical: 'text-rose-400 bg-rose-500/10 border-rose-500/20',
-  high: 'text-orange-400 bg-orange-500/10 border-orange-500/20',
-  medium: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
-  low: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+interface SafeZone {
+  id: string;
+  name: string;
+}
+
+const severityStyles: Record<string, string> = {
+  critical:
+    'text-rose-400 bg-rose-500/10 border-rose-500/20',
+  high:
+    'text-orange-400 bg-orange-500/10 border-orange-500/20',
+  medium:
+    'text-amber-400 bg-amber-500/10 border-amber-500/20',
+  low:
+    'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
 };
 
 const riskColors: Record<string, string> = {
@@ -54,229 +60,501 @@ const riskColors: Record<string, string> = {
   low: '#34D399',
 };
 
-const incidentTrend = [
-  { month: 'Jan', incidents: 45, risk: 0.62 },
-  { month: 'Feb', incidents: 38, risk: 0.55 },
-  { month: 'Mar', incidents: 67, risk: 0.71 },
-  { month: 'Apr', incidents: 52, risk: 0.65 },
-  { month: 'May', incidents: 89, risk: 0.82 },
-  { month: 'Jun', incidents: 72, risk: 0.76 },
-  { month: 'Jul', incidents: 95, risk: 0.88 },
-  { month: 'Aug', incidents: 108, risk: 0.91 },
-  { month: 'Sep', incidents: 78, risk: 0.73 },
-  { month: 'Oct', incidents: 92, risk: 0.79 },
-  { month: 'Nov', incidents: 85, risk: 0.77 },
-  { month: 'Dec', incidents: 110, risk: 0.93 },
-];
-
-const categoryBreakdown = [
-  { category: 'Harassment', count: 45, color: '#EC4899' },
-  { category: 'Stalking', count: 28, color: '#8B5CF6' },
-  { category: 'Assault', count: 15, color: '#F43F5E' },
-  { category: 'Voyeurism', count: 8, color: '#60A5FA' },
-  { category: 'Other', count: 12, color: '#A855F7' },
-];
-
-const aiInsights = [
-  { icon: Brain, text: '3 new high-risk corridors detected in Central Delhi zone this week', severity: 'critical' },
-  { icon: Zap, text: 'Stalking incidents up 23% near metro stations after 9 PM', severity: 'high' },
-  { icon: Shield, text: 'Community safe route verified: Hauz Khas Village corridor now active', severity: 'low' },
-  { icon: Activity, text: 'Predictive model flags Sector 18 for potential escalation this weekend', severity: 'high' },
-];
+const categoryColors: Record<string, string> = {
+  harassment: '#EC4899',
+  stalking: '#A855F7',
+  assault: '#EF4444',
+  voyeurism: '#3B82F6',
+  other: '#8B5CF6',
+};
 
 export default function Dashboard() {
   const [reports, setReports] = useState<SafetyReport[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [_loading, setLoading] = useState(true);
+  const [safeZones, setSafeZones] = useState<SafeZone[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const [reportsRes, alertsRes] = await Promise.all([
-          supabase.from('safety_reports').select('*').order('created_at', { ascending: false }).limit(10),
-          supabase.from('alerts').select('*').eq('is_active', true).order('created_at', { ascending: false }),
+    async function fetchDashboardData() {
+      setLoading(true);
+
+      const [reportsRes, alertsRes, safeZonesRes] =
+        await Promise.all([
+          supabase
+            .from('safety_reports')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(100),
+
+          supabase
+            .from('alerts')
+            .select('*')
+            .eq('is_active', true)
+            .order('created_at', { ascending: false }),
+
+          supabase
+            .from('safe_zones')
+            .select('id, name')
+            .order('created_at', { ascending: false }),
         ]);
-        if (reportsRes.data) setReports(reportsRes.data);
-        if (alertsRes.data) setAlerts(alertsRes.data);
-      } catch {
-        // Use fallback data
+
+      if (reportsRes.error) {
+        console.error('Reports error:', reportsRes.error);
+      } else {
+        setReports(reportsRes.data || []);
       }
+
+      if (alertsRes.error) {
+        console.error('Alerts error:', alertsRes.error);
+      } else {
+        setAlerts(alertsRes.data || []);
+      }
+
+      if (safeZonesRes.error) {
+        console.error('Safe zones error:', safeZonesRes.error);
+      } else {
+        setSafeZones(safeZonesRes.data || []);
+      }
+
       setLoading(false);
     }
-    fetchData();
+
+    fetchDashboardData();
   }, []);
 
-  const totalReports = reports.length || 15;
-  const highRiskZones = alerts.filter(a => a.risk_level === 'critical' || a.risk_level === 'high').length || 4;
-  const activeAlerts = alerts.length || 6;
-  const safeAreas = 8;
+  const totalReports = reports.length;
 
-  const statCards = [
+  const highRiskReports = useMemo(
+    () =>
+      reports.filter((report) => {
+        const severity = report.severity?.toLowerCase();
+        return severity === 'critical' || severity === 'high';
+      }).length,
+    [reports]
+  );
+
+  const activeAlerts = alerts.length;
+  const safeAreas = safeZones.length;
+
+  const reportsThisWeek = useMemo(() => {
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
+    return reports.filter(
+      (report) =>
+        new Date(report.created_at).getTime() >= weekAgo
+    ).length;
+  }, [reports]);
+
+  const categoryCounts = useMemo(() => {
+    const counts = {
+      harassment: 0,
+      stalking: 0,
+      assault: 0,
+      voyeurism: 0,
+      other: 0,
+    };
+
+    reports.forEach((report) => {
+      const category = report.category?.toLowerCase();
+
+      if (category === 'harassment') {
+        counts.harassment++;
+      } else if (category === 'stalking') {
+        counts.stalking++;
+      } else if (category === 'assault') {
+        counts.assault++;
+      } else if (category === 'voyeurism') {
+        counts.voyeurism++;
+      } else {
+        counts.other++;
+      }
+    });
+
+    return counts;
+  }, [reports]);
+
+  const categoryBreakdown = [
     {
-      label: 'Total Safety Reports',
-      value: totalReports.toLocaleString(),
-      change: '+12.5%',
-      trend: 'up' as const,
-      icon: ShieldAlert,
-      gradient: 'from-violet-500 to-purple-600',
-      glow: 'rgba(139, 92, 246, 0.2)',
+      category: 'Harassment',
+      key: 'harassment',
+      count: categoryCounts.harassment,
     },
     {
-      label: 'High Risk Zones',
-      value: highRiskZones.toString(),
-      change: '+3 new',
-      trend: 'up' as const,
-      icon: AlertTriangle,
-      gradient: 'from-rose-500 to-red-600',
-      glow: 'rgba(244, 63, 94, 0.2)',
+      category: 'Stalking',
+      key: 'stalking',
+      count: categoryCounts.stalking,
     },
     {
-      label: 'Active Alerts',
-      value: activeAlerts.toString(),
-      change: '2 critical',
-      trend: 'up' as const,
-      icon: Radio,
-      gradient: 'from-amber-500 to-orange-600',
-      glow: 'rgba(245, 158, 11, 0.2)',
+      category: 'Assault',
+      key: 'assault',
+      count: categoryCounts.assault,
     },
     {
-      label: 'Safe Areas Identified',
-      value: safeAreas.toString(),
-      change: '+2 this week',
-      trend: 'up' as const,
-      icon: Shield,
-      gradient: 'from-emerald-500 to-teal-600',
-      glow: 'rgba(52, 211, 153, 0.2)',
+      category: 'Voyeurism',
+      key: 'voyeurism',
+      count: categoryCounts.voyeurism,
+    },
+    {
+      category: 'Other',
+      key: 'other',
+      count: categoryCounts.other,
     },
   ];
 
+  const currentYear = new Date().getFullYear();
+
+  const incidentTrend = useMemo(() => {
+    return Array.from({ length: 12 }, (_, month) => {
+      const monthReports = reports.filter((report) => {
+        const date = new Date(report.created_at);
+
+        return (
+          date.getFullYear() === currentYear &&
+          date.getMonth() === month
+        );
+      });
+
+      return {
+        month: new Date(
+          currentYear,
+          month,
+          1
+        ).toLocaleString('en-US', {
+          month: 'short',
+        }),
+        incidents: monthReports.length,
+      };
+    });
+  }, [reports, currentYear]);
+
+  const maxIncidents = Math.max(
+    1,
+    ...incidentTrend.map((item) => item.incidents)
+  );
+
+  const topCategory = useMemo(() => {
+    const entries = Object.entries(categoryCounts);
+
+    return entries.sort((a, b) => b[1] - a[1])[0];
+  }, [categoryCounts]);
+
+  const latestReport = reports[0];
+
+  const stats = [
+    {
+      label: 'Total Safety Reports',
+      value: totalReports,
+      change:
+        reportsThisWeek > 0
+          ? `+${reportsThisWeek} this week`
+          : 'No new reports',
+      positive: reportsThisWeek > 0,
+      icon: ShieldAlert,
+      gradient: 'from-violet-500 to-purple-600',
+    },
+    {
+      label: 'High Risk Reports',
+      value: highRiskReports,
+      change:
+        highRiskReports > 0
+          ? `${highRiskReports} high risk`
+          : 'None detected',
+      positive: false,
+      icon: AlertTriangle,
+      gradient: 'from-rose-500 to-red-600',
+    },
+    {
+      label: 'Active Alerts',
+      value: activeAlerts,
+      change:
+        activeAlerts > 0
+          ? `${activeAlerts} active`
+          : 'No active alerts',
+      positive: false,
+      icon: Radio,
+      gradient: 'from-amber-500 to-orange-600',
+    },
+    {
+      label: 'Safe Areas Identified',
+      value: safeAreas,
+      change:
+        safeAreas > 0
+          ? `${safeAreas} registered`
+          : 'None registered',
+      positive: safeAreas > 0,
+      icon: Shield,
+      gradient: 'from-emerald-500 to-teal-600',
+    },
+  ];
+
+  const insights = useMemo(() => {
+    const result: {
+      icon: typeof Brain;
+      text: string;
+      type: 'info' | 'warning';
+    }[] = [];
+
+    if (totalReports === 0) {
+      result.push({
+        icon: Brain,
+        text:
+          'No safety reports are currently stored. Submit a report to begin building safety intelligence.',
+        type: 'info',
+      });
+
+      return result;
+    }
+
+    result.push({
+      icon: Activity,
+      text: `${totalReports} safety report${
+        totalReports === 1 ? '' : 's'
+      } currently stored in the system.`,
+      type: 'info',
+    });
+
+    if (highRiskReports > 0) {
+      result.push({
+        icon: AlertTriangle,
+        text: `${highRiskReports} report${
+          highRiskReports === 1 ? '' : 's'
+        } are marked high or critical severity.`,
+        type: 'warning',
+      });
+    }
+
+    if (topCategory && topCategory[1] > 0) {
+      result.push({
+        icon: Brain,
+        text: `${topCategory[0]} is currently the most frequently reported category.`,
+        type: 'info',
+      });
+    }
+
+    if (latestReport) {
+      result.push({
+        icon: MapPin,
+        text: `Latest report: ${
+          latestReport.category || 'Incident'
+        } near ${
+          latestReport.location_name || 'an unspecified location'
+        }.`,
+        type: 'info',
+      });
+    }
+
+    return result;
+  }, [
+    totalReports,
+    highRiskReports,
+    topCategory,
+    latestReport,
+  ]);
+
   return (
     <div className="space-y-6">
-      {/* Page title */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100 tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-            Safety <span className="gradient-text">Intelligence</span>
+          <h1
+            className="text-2xl font-bold text-slate-100 tracking-tight"
+            style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+            }}
+          >
+            Safety{' '}
+            <span className="gradient-text">
+              Intelligence
+            </span>
           </h1>
-          <p className="text-sm text-slate-500 mt-1">Real-time safety analytics and threat intelligence</p>
+
+          <p className="text-sm text-slate-500 mt-1">
+            Real-time safety analytics from community reports
+          </p>
         </div>
-        <div className="flex items-center gap-3">
-          <select className="input-field w-auto text-sm py-2">
-            <option>Last 30 days</option>
-            <option>Last 7 days</option>
-            <option>Last 90 days</option>
-          </select>
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-emerald-400" style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.2)' }}>
-            <span className="w-2 h-2 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 8px rgba(52,211,153,0.5)' }} />
-            Live Monitoring
-          </div>
+
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">
+          <span
+            className="w-2 h-2 rounded-full bg-emerald-400"
+            style={{
+              boxShadow: '0 0 8px rgba(52,211,153,0.5)',
+            }}
+          />
+          Data Connected
         </div>
       </div>
 
-      {/* Stat cards */}
+      {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {statCards.map((stat, i) => (
+        {stats.map((stat, index) => (
           <motion.div
             key={stat.label}
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: i * 0.1 }}
+            transition={{
+              duration: 0.35,
+              delay: index * 0.05,
+            }}
             className="stat-card group"
           >
             <div className="flex items-start justify-between mb-4">
-              <div className={`w-11 h-11 rounded-xl flex items-center justify-center bg-gradient-to-br ${stat.gradient} opacity-80 group-hover:opacity-100 transition-opacity`}>
+              <div
+                className={`w-11 h-11 rounded-xl flex items-center justify-center bg-gradient-to-br ${stat.gradient}`}
+              >
                 <stat.icon className="w-5 h-5 text-white" />
               </div>
-              <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400">
-                {stat.trend === 'up' ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+
+              <span
+                className={`text-xs font-semibold ${
+                  stat.positive
+                    ? 'text-emerald-400'
+                    : 'text-slate-500'
+                }`}
+              >
+                {stat.positive && (
+                  <ArrowUpRight className="w-3 h-3 inline mr-1" />
+                )}
                 {stat.change}
               </span>
             </div>
-            <p className="text-2xl font-bold text-slate-100 tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-              {stat.value}
+
+            <p
+              className="text-2xl font-bold text-slate-100"
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+              }}
+            >
+              {loading ? '—' : stat.value}
             </p>
-            <p className="text-sm text-slate-500 mt-1">{stat.label}</p>
+
+            <p className="text-sm text-slate-500 mt-1">
+              {stat.label}
+            </p>
           </motion.div>
         ))}
       </div>
 
-      {/* Charts row */}
+      {/* Trends + Categories */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        {/* Incident Trends Chart */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.3 }}
           className="xl:col-span-2 glass-card p-6"
         >
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-base font-semibold text-slate-200">Incident Trends</h2>
-              <p className="text-sm text-slate-500 mt-0.5">Monthly incident volume and risk index</p>
+              <h2 className="text-base font-semibold text-slate-200">
+                Incident Trends
+              </h2>
+
+              <p className="text-sm text-slate-500 mt-0.5">
+                Monthly reports stored in the system
+              </p>
             </div>
-            <div className="flex items-center gap-4 text-xs">
-              <span className="flex items-center gap-1.5"><span className="w-3 h-1.5 rounded-full bg-violet-500" /> Incidents</span>
-              <span className="flex items-center gap-1.5"><span className="w-3 h-1.5 rounded-full bg-pink-500" /> Risk Index</span>
-            </div>
+
+            <span className="text-xs text-slate-600">
+              {currentYear}
+            </span>
           </div>
+
           <div className="flex items-end gap-1.5 h-52">
             {incidentTrend.map((item) => {
-              const maxIncidents = Math.max(...incidentTrend.map(d => d.incidents));
-              const heightPct = (item.incidents / maxIncidents) * 100;
+              const height =
+                item.incidents > 0
+                  ? (item.incidents / maxIncidents) * 100
+                  : 0;
+
               return (
-                <div key={item.month} className="flex-1 flex flex-col items-center gap-2">
+                <div
+                  key={item.month}
+                  className="flex-1 flex flex-col items-center gap-2"
+                >
                   <div className="w-full flex items-end h-44 relative group">
                     <motion.div
                       initial={{ height: 0 }}
-                      animate={{ height: `${heightPct}%` }}
-                      transition={{ duration: 0.8, delay: 0.1 }}
-                      className="w-full rounded-t-md cursor-pointer"
+                      animate={{ height: `${height}%` }}
+                      transition={{ duration: 0.6 }}
+                      className="w-full rounded-t-md"
                       style={{
-                        background: `linear-gradient(to top, #8B5CF6, #A855F7)`,
-                        opacity: 0.8,
+                        background:
+                          'linear-gradient(to top, #8B5CF6, #A855F7)',
+                        opacity:
+                          item.incidents > 0 ? 0.85 : 0.15,
                       }}
                     />
-                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 hidden group-hover:block px-2 py-1 rounded-md text-[10px] text-white whitespace-nowrap" style={{ background: 'rgba(15,23,42,0.9)' }}>
-                      {item.incidents} incidents
-                    </div>
+
+                    <span className="absolute -top-7 left-1/2 -translate-x-1/2 hidden group-hover:block px-2 py-1 rounded-md text-[10px] text-white bg-slate-900 whitespace-nowrap">
+                      {item.incidents} report
+                      {item.incidents === 1 ? '' : 's'}
+                    </span>
                   </div>
-                  <span className="text-[10px] text-slate-600 font-medium">{item.month}</span>
+
+                  <span className="text-[10px] text-slate-600">
+                    {item.month}
+                  </span>
                 </div>
               );
             })}
           </div>
+
+          {totalReports === 0 && (
+            <p className="text-xs text-slate-600 text-center mt-3">
+              Report history will appear here after submissions.
+            </p>
+          )}
         </motion.div>
 
-        {/* Category Breakdown */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.4 }}
           className="glass-card p-6"
         >
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-base font-semibold text-slate-200">Category Breakdown</h2>
-              <p className="text-sm text-slate-500 mt-0.5">Incident distribution by type</p>
-            </div>
+          <div className="mb-6">
+            <h2 className="text-base font-semibold text-slate-200">
+              Category Breakdown
+            </h2>
+
+            <p className="text-sm text-slate-500 mt-0.5">
+              Reports by incident type
+            </p>
           </div>
+
           <div className="space-y-4">
-            {categoryBreakdown.map((cat) => {
-              const maxCount = Math.max(...categoryBreakdown.map(c => c.count));
-              const widthPct = (cat.count / maxCount) * 100;
+            {categoryBreakdown.map((category) => {
+              const maxCount = Math.max(
+                1,
+                ...categoryBreakdown.map(
+                  (item) => item.count
+                )
+              );
+
+              const width =
+                category.count > 0
+                  ? (category.count / maxCount) * 100
+                  : 0;
+
               return (
-                <div key={cat.category}>
+                <div key={category.category}>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-sm text-slate-300">{cat.category}</span>
-                    <span className="text-sm font-semibold text-slate-200">{cat.count}</span>
+                    <span className="text-sm text-slate-300">
+                      {category.category}
+                    </span>
+
+                    <span className="text-sm font-semibold text-slate-200">
+                      {category.count}
+                    </span>
                   </div>
+
                   <div className="h-2 rounded-full bg-slate-800/50 overflow-hidden">
                     <motion.div
                       initial={{ width: 0 }}
-                      animate={{ width: `${widthPct}%` }}
-                      transition={{ duration: 0.8, delay: 0.5 }}
+                      animate={{ width: `${width}%` }}
+                      transition={{ duration: 0.6 }}
                       className="h-full rounded-full"
-                      style={{ background: cat.color }}
+                      style={{
+                        background:
+                          categoryColors[category.key],
+                      }}
                     />
                   </div>
                 </div>
@@ -286,182 +564,294 @@ export default function Dashboard() {
         </motion.div>
       </div>
 
-      {/* AI Insights + Alert Feed */}
+      {/* Insights + Alerts */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        {/* AI Insights */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.5 }}
           className="glass-card p-6"
         >
           <div className="flex items-center gap-2 mb-6">
             <Brain className="w-5 h-5 text-violet-400" />
-            <h2 className="text-base font-semibold text-slate-200">AI Safety Insights</h2>
-            <span className="ml-auto px-2 py-0.5 rounded-md text-[10px] font-semibold text-violet-300 bg-violet-500/10 border border-violet-500/20">AI Generated</span>
+
+            <h2 className="text-base font-semibold text-slate-200">
+              Safety Insights
+            </h2>
+
+            <span className="ml-auto px-2 py-0.5 rounded-md text-[10px] font-semibold text-violet-300 bg-violet-500/10 border border-violet-500/20">
+              DATA DERIVED
+            </span>
           </div>
+
           <div className="space-y-3">
-            {aiInsights.map((insight, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3, delay: 0.6 + i * 0.1 }}
-                className="flex items-start gap-3 p-3 rounded-xl hover:bg-violet-500/5 transition-colors cursor-pointer group"
+            {insights.map((insight, index) => (
+              <div
+                key={index}
+                className="flex items-start gap-3 p-3 rounded-xl"
               >
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                  insight.severity === 'critical' ? 'bg-rose-500/10' :
-                  insight.severity === 'high' ? 'bg-amber-500/10' : 'bg-emerald-500/10'
-                }`}>
-                  <insight.icon className={`w-4 h-4 ${
-                    insight.severity === 'critical' ? 'text-rose-400' :
-                    insight.severity === 'high' ? 'text-amber-400' : 'text-emerald-400'
-                  }`} />
+                <div
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    insight.type === 'warning'
+                      ? 'bg-amber-500/10'
+                      : 'bg-emerald-500/10'
+                  }`}
+                >
+                  <insight.icon
+                    className={`w-4 h-4 ${
+                      insight.type === 'warning'
+                        ? 'text-amber-400'
+                        : 'text-emerald-400'
+                    }`}
+                  />
                 </div>
-                <p className="text-sm text-slate-400 leading-relaxed flex-1">{insight.text}</p>
-                <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-violet-400 transition-colors flex-shrink-0 mt-0.5" />
-              </motion.div>
+
+                <p className="text-sm text-slate-400 leading-relaxed">
+                  {insight.text}
+                </p>
+              </div>
             ))}
           </div>
         </motion.div>
 
-        {/* Live Alert Feed */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.6 }}
           className="glass-card p-6"
         >
           <div className="flex items-center gap-2 mb-6">
             <Radio className="w-5 h-5 text-rose-400" />
-            <h2 className="text-base font-semibold text-slate-200">Live Alert Feed</h2>
-            <span className="ml-auto flex items-center gap-1.5 text-[10px] font-semibold text-rose-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 glow-pulse" />
+
+            <h2 className="text-base font-semibold text-slate-200">
+              Live Alert Feed
+            </h2>
+
+            <span className="ml-auto text-[10px] font-semibold text-rose-400 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
               LIVE
             </span>
           </div>
-          <div className="space-y-3 max-h-80 overflow-y-auto">
-            <AnimatePresence>
-              {(alerts.length ? alerts : [
-                { id: '1', title: 'High Risk Zone: Connaught Place', description: 'Multiple harassment reports in last 48 hours', zone: 'Central Delhi', risk_level: 'critical', alert_type: 'zone_warning', is_active: true, created_at: new Date().toISOString() },
-                { id: '2', title: 'Stalking Pattern: Rajiv Chowk', description: 'AI detected serial stalking pattern', zone: 'Central Delhi', risk_level: 'critical', alert_type: 'ai_detection', is_active: true, created_at: new Date(Date.now() - 3600000).toISOString() },
-                { id: '3', title: 'Moderate Risk: Sector 18', description: 'Evening hours show elevated incidents', zone: 'Noida', risk_level: 'high', alert_type: 'zone_warning', is_active: true, created_at: new Date(Date.now() - 7200000).toISOString() },
-                { id: '4', title: 'Safe Route: Hauz Khas Village', description: 'Community verified safe route active', zone: 'South Delhi', risk_level: 'low', alert_type: 'safe_route', is_active: true, created_at: new Date(Date.now() - 10800000).toISOString() },
-                { id: '5', title: 'Patrol Deployed: India Gate', description: 'Police patrol active after critical report', zone: 'Central Delhi', risk_level: 'high', alert_type: 'patrol_active', is_active: true, created_at: new Date(Date.now() - 14400000).toISOString() },
-                { id: '6', title: 'New Pattern: Expressway', description: 'Vehicle-based stalking incidents increasing', zone: 'Noida-Greater Noida', risk_level: 'critical', alert_type: 'ai_detection', is_active: true, created_at: new Date(Date.now() - 18000000).toISOString() },
-              ]).map((alert, i) => (
-                <motion.div
-                  key={alert.id}
-                  initial={{ opacity: 0, x: 10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3, delay: 0.7 + i * 0.1 }}
-                  className="flex items-start gap-3 p-3 rounded-xl hover:bg-violet-500/5 transition-colors cursor-pointer"
-                >
+
+          {alerts.length > 0 ? (
+            <div className="space-y-3 max-h-80 overflow-y-auto">
+              {alerts.map((alert) => {
+                const risk =
+                  alert.risk_level?.toLowerCase() || 'low';
+
+                return (
                   <div
-                    className="w-2 h-2 rounded-full mt-2 flex-shrink-0"
-                    style={{
-                      backgroundColor: riskColors[alert.risk_level] || '#8B5CF6',
-                      boxShadow: `0 0 8px ${riskColors[alert.risk_level] || '#8B5CF6'}50`,
-                    }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-200 truncate">{alert.title}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{alert.description}</p>
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <span className="text-[10px] text-slate-600 flex items-center gap-1">
-                        <MapPin className="w-3 h-3" /> {alert.zone}
-                      </span>
-                      <span className="text-[10px] text-slate-600 flex items-center gap-1">
-                        <Clock className="w-3 h-3" /> {new Date(alert.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
+                    key={alert.id}
+                    className="flex items-start gap-3 p-3 rounded-xl hover:bg-violet-500/5 transition-colors"
+                  >
+                    <span
+                      className="w-2 h-2 rounded-full mt-2 flex-shrink-0"
+                      style={{
+                        backgroundColor:
+                          riskColors[risk] || '#8B5CF6',
+                      }}
+                    />
+
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-200">
+                        {alert.title}
+                      </p>
+
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {alert.description}
+                      </p>
+
+                      <div className="flex items-center gap-3 mt-1.5">
+                        <span className="text-[10px] text-slate-600 flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          {alert.zone || 'Unknown zone'}
+                        </span>
+
+                        <span className="text-[10px] text-slate-600 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {new Date(
+                            alert.created_at
+                          ).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                      </div>
                     </div>
+
+                    <span
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${
+                        severityStyles[risk] || ''
+                      }`}
+                    >
+                      {risk}
+                    </span>
                   </div>
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${severityColors[alert.risk_level] || ''}`}>
-                    {alert.risk_level}
-                  </span>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="py-10 text-center">
+              <Radio className="w-8 h-8 text-slate-700 mx-auto mb-3" />
+
+              <p className="text-sm text-slate-500">
+                No active alerts
+              </p>
+
+              <p className="text-xs text-slate-600 mt-1">
+                Active safety alerts will appear here.
+              </p>
+            </div>
+          )}
         </motion.div>
       </div>
 
-      {/* Recent Reports Table */}
+      {/* Recent Reports */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.7 }}
         className="glass-card overflow-hidden"
       >
         <div className="flex items-center justify-between px-6 py-5 border-b border-violet-500/10">
           <div>
-            <h2 className="text-base font-semibold text-slate-200">Recent Safety Reports</h2>
-            <p className="text-sm text-slate-500 mt-0.5">Latest anonymous intelligence submissions</p>
+            <h2 className="text-base font-semibold text-slate-200">
+              Recent Safety Reports
+            </h2>
+
+            <p className="text-sm text-slate-500 mt-0.5">
+              Latest anonymous submissions
+            </p>
           </div>
-          <button className="text-sm text-violet-400 font-medium hover:text-violet-300 transition-colors">
-            View All
-          </button>
+
+          <span className="text-xs text-slate-600">
+            {totalReports} total
+          </span>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr style={{ background: 'rgba(139, 92, 246, 0.03)' }}>
-                <th className="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-6 py-3">Category</th>
-                <th className="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-6 py-3">Location</th>
-                <th className="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-6 py-3 hidden md:table-cell">Zone</th>
-                <th className="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-6 py-3">Severity</th>
-                <th className="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-6 py-3 hidden lg:table-cell">AI Risk</th>
-                <th className="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-6 py-3 hidden lg:table-cell">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-violet-500/5">
-              {(reports.length ? reports : [
-                { id: '1', category: 'harassment', description: 'Verbal harassment near bus stop', severity: 'high', location_name: 'Connaught Place', zone: 'Central Delhi', ai_risk_score: 0.82, status: 'verified', created_at: new Date().toISOString() },
-                { id: '2', category: 'stalking', description: 'Followed from metro station', severity: 'critical', location_name: 'Rajiv Chowk Metro', zone: 'Central Delhi', ai_risk_score: 0.94, status: 'verified', created_at: new Date().toISOString() },
-                { id: '3', category: 'harassment', description: 'Catcalling in market area', severity: 'medium', location_name: 'Sector 18 Market', zone: 'Noida', ai_risk_score: 0.65, status: 'verified', created_at: new Date().toISOString() },
-                { id: '4', category: 'assault', description: 'Physical intimidation near park', severity: 'critical', location_name: 'India Gate Area', zone: 'Central Delhi', ai_risk_score: 0.97, status: 'verified', created_at: new Date().toISOString() },
-                { id: '5', category: 'stalking', description: 'Repeated following same route', severity: 'high', location_name: 'Hauz Khas', zone: 'South Delhi', ai_risk_score: 0.85, status: 'verified', created_at: new Date().toISOString() },
-              ]).map((report) => (
-                <tr key={report.id} className="hover:bg-violet-500/5 transition-colors cursor-pointer">
-                  <td className="px-6 py-4">
-                    <span className="text-sm font-medium text-slate-200 capitalize">{report.category}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm text-slate-400 flex items-center gap-1.5">
-                      <MapPin className="w-3 h-3 text-violet-400/50" />
-                      {report.location_name}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 hidden md:table-cell">
-                    <span className="text-sm text-slate-500">{report.zone}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-md border ${severityColors[report.severity] || ''}`}>
-                      {report.severity}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 hidden lg:table-cell">
-                    <div className="flex items-center gap-2">
-                      <div className="w-16 h-1.5 rounded-full bg-slate-800/50 overflow-hidden">
-                        <div
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${(report.ai_risk_score || 0) * 100}%`,
-                            background: report.ai_risk_score > 0.8 ? '#F43F5E' : report.ai_risk_score > 0.6 ? '#FBBF24' : '#34D399',
-                          }}
-                        />
-                      </div>
-                      <span className="text-xs text-slate-500">{((report.ai_risk_score || 0) * 100).toFixed(0)}%</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 hidden lg:table-cell">
-                    <span className="text-xs text-slate-500 capitalize">{report.status}</span>
-                  </td>
+
+        {reports.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-violet-500/[0.03]">
+                  <th className="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-6 py-3">
+                    Category
+                  </th>
+
+                  <th className="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-6 py-3">
+                    Location
+                  </th>
+
+                  <th className="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-6 py-3 hidden md:table-cell">
+                    Zone
+                  </th>
+
+                  <th className="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-6 py-3">
+                    Severity
+                  </th>
+
+                  <th className="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-6 py-3 hidden lg:table-cell">
+                    AI Risk
+                  </th>
+
+                  <th className="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-6 py-3 hidden lg:table-cell">
+                    Status
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+
+              <tbody className="divide-y divide-violet-500/5">
+                {reports.slice(0, 10).map((report) => {
+                  const severity =
+                    report.severity?.toLowerCase() || 'low';
+
+                  const risk = Math.min(
+                    100,
+                    Math.max(
+                      0,
+                      (report.ai_risk_score || 0) * 100
+                    )
+                  );
+
+                  return (
+                    <tr
+                      key={report.id}
+                      className="hover:bg-violet-500/5 transition-colors"
+                    >
+                      <td className="px-6 py-4">
+                        <span className="text-sm font-medium text-slate-200 capitalize">
+                          {report.category || 'Other'}
+                        </span>
+                      </td>
+
+                      <td className="px-6 py-4">
+                        <span className="text-sm text-slate-400 flex items-center gap-1.5">
+                          <MapPin className="w-3 h-3 text-violet-400/50" />
+                          {report.location_name ||
+                            'Not specified'}
+                        </span>
+                      </td>
+
+                      <td className="px-6 py-4 hidden md:table-cell">
+                        <span className="text-sm text-slate-500">
+                          {report.zone || 'Not specified'}
+                        </span>
+                      </td>
+
+                      <td className="px-6 py-4">
+                        <span
+                          className={`text-[10px] font-semibold px-2.5 py-1 rounded-md border ${
+                            severityStyles[severity] || ''
+                          }`}
+                        >
+                          {severity}
+                        </span>
+                      </td>
+
+                      <td className="px-6 py-4 hidden lg:table-cell">
+                        <div className="flex items-center gap-2">
+                          <div className="w-16 h-1.5 rounded-full bg-slate-800/50 overflow-hidden">
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${risk}%`,
+                                background:
+                                  risk > 80
+                                    ? '#F43F5E'
+                                    : risk > 60
+                                    ? '#FBBF24'
+                                    : '#34D399',
+                              }}
+                            />
+                          </div>
+
+                          <span className="text-xs text-slate-500">
+                            {risk.toFixed(0)}%
+                          </span>
+                        </div>
+                      </td>
+
+                      <td className="px-6 py-4 hidden lg:table-cell">
+                        <span className="text-xs text-slate-500 capitalize">
+                          {report.status || 'pending'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="py-12 text-center">
+            <ShieldAlert className="w-8 h-8 text-slate-700 mx-auto mb-3" />
+
+            <p className="text-sm text-slate-500">
+              No safety reports yet
+            </p>
+
+            <p className="text-xs text-slate-600 mt-1">
+              Anonymous reports will appear here after submission.
+            </p>
+          </div>
+        )}
       </motion.div>
     </div>
   );
