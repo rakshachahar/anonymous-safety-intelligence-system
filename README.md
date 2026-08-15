@@ -1,467 +1,486 @@
-# SafeVoice — Anonymous Safety Intelligence System
+# 🛡️ SafeVoice — Anonymous Safety Intelligence System
 
-SafeVoice is an AI-assisted anonymous safety intelligence platform that helps communities report safety incidents, visualize location-based risk patterns, and improve awareness of potentially unsafe areas.
+A privacy-focused web application for **anonymously reporting safety incidents and transforming community reports into useful, location-based safety intelligence**.
 
-The platform combines anonymous incident reporting, location-based safety visualization, data-driven safety analytics, emergency SOS support, and authenticated administrator moderation in a single React application.
+SafeVoice combines anonymous incident reporting, safety analytics, geographic visualization, emergency SOS support, and administrator moderation into a single platform.
 
-## 🌐 Live Demo
-
-**Production Application:**  
-https://anonymous-safety-intelligence-syste.vercel.app
+🌐 **Live Demo:**
+https://anonymous-safety-intelligence-syste.vercel.app/
 
 ---
 
-## 🎯 Problem Statement
+## 🎯 Why SafeVoice?
 
-Many safety incidents remain unreported because people may fear:
+Many safety incidents go unreported because people may be uncomfortable revealing their identity, unsure where to report an incident, or unaware of recurring safety patterns in their area.
 
-- judgment or social consequences
-- exposure of their identity
-- lack of accessible reporting systems
-- uncertainty about unsafe areas
+SafeVoice focuses on a simple idea:
 
-Individual incidents can also remain isolated, making it difficult to identify recurring patterns across locations and time.
+> **Make safety reporting easier, keep it privacy-focused, and turn individual reports into useful community-level information.**
 
-SafeVoice addresses this problem by combining anonymous reporting with location-based safety intelligence.
+Instead of treating every incident as an isolated event, SafeVoice provides a way to aggregate reports and visualize broader safety patterns.
 
 ---
 
-## 💡 Solution
+## 🚀 Key Features
 
-SafeVoice allows users to submit safety incidents without directly attaching their personal identity to the report.
+### 📝 Anonymous Incident Reporting
 
-Stored reports can be used to:
+Users can submit safety incidents without publicly identifying themselves.
 
-- analyze incident categories and severity
-- visualize reported locations
-- identify areas with higher concentrations of incidents
-- generate data-derived safety insights
-- support administrator moderation
-- record emergency SOS events
+A report can include:
 
-The goal is to transform individual reports into useful community-level safety information.
+* Incident category
+* Severity
+* Description
+* Location
+* Geographic coordinates when available
 
----
-
-# 🚀 Key Features
-
-## 1. Anonymous Safety Reporting
-
-Users can submit safety incidents with:
-
-- incident category
-- severity
-- description
-- location
-- geographical coordinates when available
-
-Reports are stored in Supabase and can be reviewed through the administrative interface.
+Submitted reports are stored in Supabase and can be reviewed through the administrator interface.
 
 ---
 
-## 2. Interactive Safety Heatmap
+### 📍 Safety Heatmap
 
-Reports containing valid latitude and longitude coordinates can be displayed on an interactive map.
+Reports containing valid geographic coordinates can be displayed on an interactive map.
 
-The heatmap supports:
+This allows users and administrators to identify areas where reported incidents are concentrated and understand geographic safety patterns.
 
-- location-based incident visualization
-- severity-based indicators
-- multiple reported locations
-- interactive map exploration
-- geographical safety awareness
-
-Reports without coordinates can still be stored, but cannot be plotted geographically.
+The heatmap is based on **actual stored report data**, rather than hardcoded demonstration values.
 
 ---
 
-## 3. Safety Intelligence Dashboard
+### 📊 Safety Dashboard
 
-The dashboard derives its core statistics from stored application data.
+The dashboard provides an overview of safety-related application data.
 
 It includes:
 
-- total safety reports
-- high-risk reports
-- active safety alerts
-- incident trends
-- category breakdown
-- recent reports
-- safety insights
-- risk indicators
+* Total reports
+* High-risk reports
+* Safety alerts
+* Incident trends
+* Category breakdown
+* Recent reports
+* Risk indicators
 
-Primary report metrics are derived from application data rather than fixed demonstration numbers.
-
----
-
-## 4. AI-Assisted Safety Analysis
-
-SafeVoice includes an analysis layer intended to support safety awareness.
-
-The system can assist with:
-
-- incident categorization
-- severity analysis
-- identifying recurring patterns
-- generating safety-oriented insights
-- location-based risk awareness
-
-AI-assisted information is presented as decision-support information and does not replace human judgment, law enforcement, or emergency services.
+The displayed statistics are derived from the application's stored data.
 
 ---
 
-## 5. Emergency SOS
+### 🚨 SOS Support
 
-The SOS interface provides an emergency alert workflow.
+SafeVoice includes an SOS workflow for recording emergency events.
 
-It includes:
+The workflow provides:
 
-- SOS activation
-- activation countdown
-- available location information
-- SOS event storage
-- emergency support interface
+* SOS activation
+* Countdown interface
+* Available location information
+* SOS event recording
 
-The current system records SOS events within the application. It does not claim to automatically dispatch police, ambulances, or emergency responders.
+**Important:** SafeVoice does not automatically contact police, ambulances, or other emergency services.
 
----
-
-## 6. Admin Moderation
-
-Administrators have a separate authenticated interface for managing submitted reports.
-
-The admin system supports:
-
-- reviewing reports
-- verifying reports
-- updating report status
-- monitoring safety information
-- reviewing incident details
-- managing safety alerts
-
-Administrative database operations are protected using authentication and Supabase Row Level Security policies.
+The SOS functionality should therefore **not be considered a replacement for official emergency services**.
 
 ---
 
-## 7. Privacy-Focused Design
+### 🔐 Admin Moderation
 
-SafeVoice is designed around anonymous community reporting.
+Administrators can securely access the management interface to review submitted reports and manage safety-related information.
 
-The reporting workflow does not require users to publicly attach their personal identity to an incident report.
-
-Location information is handled separately from personal identity so geographical safety information can be used without unnecessarily exposing the reporter.
+Administrator access is separated from normal user functionality and protected using authentication and database-level security controls.
 
 ---
 
-# 🔐 Access Control
+## 🧠 Problem Statement
 
-SafeVoice uses separate application flows for public users and administrators.
+Safety incidents often remain invisible at the community level because individual reports are scattered across different channels or never submitted at all.
 
-### Public User
+Traditional reporting systems can also discourage users when they require personal identification or complicated reporting processes.
 
-Public users can access:
+At the same time, raw incident reports are difficult to interpret without analytics and geographic context.
 
-- Dashboard
-- Heatmap
-- Report
-- SOS
-- Help
-- Settings
+SafeVoice addresses these problems by combining:
 
-### Administrator
-
-Administrators authenticate through the dedicated admin login flow before accessing administrative functionality.
-
-Database permissions are additionally enforced through Supabase policies rather than relying only on frontend navigation.
+**Anonymous Reporting → Structured Data → Analytics → Geographic Intelligence → Community Awareness**
 
 ---
 
-# 🗺️ System Workflow
+## ⚙️ How It Works
+
+### 1. Submit a Report
+
+A user submits an incident through the reporting interface.
+
+### 2. Store Structured Information
+
+The application stores the incident details, severity, category, description, and available location information in Supabase.
+
+### 3. Process Report Data
+
+Stored reports are used to calculate dashboard statistics, trends, risk indicators, and category distributions.
+
+### 4. Visualize Geographic Patterns
+
+Reports containing coordinates can be displayed on the safety heatmap.
+
+### 5. Monitor Through Admin Interface
+
+Authorized administrators can review and moderate reports through the protected admin interface.
+
+### 6. Record SOS Events
+
+When the SOS workflow is activated, the event and available location information can be recorded for application-level tracking.
+
+---
+
+## 🏗️ Architecture
+
+```text
+                         ┌──────────────────────┐
+                         │      SafeVoice       │
+                         │      Web Client      │
+                         └──────────┬───────────┘
+                                    │
+                                    ▼
+                         ┌──────────────────────┐
+                         │ React + TypeScript   │
+                         │        + Vite        │
+                         └──────────┬───────────┘
+                                    │
+              ┌─────────────────────┼─────────────────────┐
+              │                     │                     │
+              ▼                     ▼                     ▼
+        ┌───────────┐        ┌───────────┐        ┌────────────┐
+        │  Reports  │        │    SOS    │        │ Analytics  │
+        └─────┬─────┘        └─────┬─────┘        └──────┬─────┘
+              │                    │                     │
+              └────────────────────┼─────────────────────┘
+                                   ▼
+                         ┌──────────────────────┐
+                         │       Supabase       │
+                         └──────────┬───────────┘
+                                    │
+                    ┌───────────────┼───────────────┐
+                    │               │               │
+                    ▼               ▼               ▼
+              PostgreSQL          Auth             RLS
+                    │               │               │
+                    └───────────────┼───────────────┘
+                                    ▼
+                         Safety Intelligence
+                                    │
+                         ┌──────────┴──────────┐
+                         ▼                     ▼
+                    Dashboard              Heatmap
+```
+
+---
+
+## 🖥️ Application Modules
+
+| Module        | Purpose                                                 |
+| ------------- | ------------------------------------------------------- |
+| **Landing**   | Introduces SafeVoice and its purpose                    |
+| **Dashboard** | Displays safety statistics, trends, and risk indicators |
+| **Report**    | Allows anonymous incident submission                    |
+| **Heatmap**   | Visualizes reported incidents geographically            |
+| **SOS**       | Provides the emergency-event workflow                   |
+| **Admin**     | Provides authenticated report moderation                |
+| **Settings**  | Provides application settings                           |
+| **Help**      | Provides platform and safety guidance                   |
+
+---
+
+## 🧰 Tech Stack
+
+### Frontend
+
+* React
+* TypeScript
+* Vite
+* Tailwind CSS
+* Framer Motion
+* Lucide React
+
+### Backend & Database
+
+* Supabase
+* PostgreSQL
+* Supabase Authentication
+* Supabase Row Level Security
+
+### Deployment
+
+* Vercel
+* GitHub
+
+---
+
+## 🔒 Privacy & Security
+
+SafeVoice is designed around privacy-conscious community reporting.
+
+Security considerations include:
+
+* Separate administrator authentication
+* Supabase Row Level Security
+* Restricted administrator database operations
+* Anonymous SOS event support
+* Environment variables for Supabase configuration
+* `.env` excluded from version control
+* No Supabase service-role credentials exposed in the frontend
+
+The application uses the Supabase public client key on the frontend.
+
+Sensitive server-side credentials are not exposed through the client application.
+
+> **Note:** Anonymous reporting does not guarantee complete anonymity against every possible infrastructure, network, or legal-level identification mechanism. Privacy claims should therefore be understood within the application's implemented architecture.
+
+---
+
+## 📸 Screenshots
+
+### Landing Page
+
+Screenshots are available in the repository's project assets.
+
+### Dashboard
+
+The dashboard presents report statistics, trends, alerts, and risk indicators.
+
+### Safety Heatmap
+
+The heatmap visualizes reports with available geographic coordinates.
+
+### Incident Reporting
+
+Users can submit structured safety reports without publicly identifying themselves.
+
+### SOS
+
+The SOS interface provides the emergency-event workflow and countdown experience.
+
+---
+
+## 🛠️ Setup & Installation
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/rakshachahar/anonymous-safety-intelligence-system.git
+
+cd anonymous-safety-intelligence-system
+```
+
+### 2. Install Dependencies
+
+```bash
+npm install
+```
+
+### 3. Configure Environment Variables
+
+Create a `.env` file in the project root:
+
+```env
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+Do not commit `.env` or other secret credentials to Git.
+
+### 4. Start the Development Server
+
+```bash
+npm run dev
+```
+
+The application will be available through the local development URL provided by Vite.
+
+### 5. Verify the Project
+
+Run the available project checks:
+
+```bash
+npm run lint
+npm run typecheck
+npm run build
+```
+
+---
+
+## 📂 Project Structure
+
+```text
+anonymous-safety-intelligence-system/
+│
+├── src/
+│   ├── components/
+│   ├── pages/
+│   ├── lib/
+│   ├── hooks/
+│   ├── services/
+│   └── ...
+│
+├── public/
+│
+├── .env
+├── .gitignore
+├── package.json
+├── vite.config.*
+├── tailwind.config.*
+└── README.md
+```
+
+> The exact folder structure may evolve as the project is developed.
+
+---
+
+## 🚀 Deployment
+
+SafeVoice is deployed using **Vercel**.
+
+🌐 **Production Application:**
+https://anonymous-safety-intelligence-syste.vercel.app/
+
+### Deployment Configuration
+
+```text
+Framework: Vite
+Build Command: npm run build
+Output Directory: dist
+Install Command: npm install
+```
+
+### Required Environment Variables
+
+```env
+VITE_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY
+```
+
+---
+
+## 📌 Example Use Case
+
+A person experiences repeated harassment around a particular location.
+
+Instead of publicly identifying themselves, they can submit an anonymous report containing:
+
+* What happened
+* Incident category
+* Severity
+* Description
+* Location
+* Available geographic information
+
+The report can then contribute to the application's analytics and geographic visualization.
+
+If multiple reports are submitted around the same area, the system can make that pattern easier to identify.
+
+This turns isolated reports into **community-level safety intelligence**.
+
+---
+
+## 📊 Data Flow
 
 ```text
 User
  │
  ▼
-Anonymous Safety Report
+Incident Report
  │
  ├── Category
  ├── Severity
  ├── Description
- └── Location / Coordinates
+ ├── Location
+ └── Coordinates
  │
  ▼
-Supabase Database
+Supabase PostgreSQL
  │
- ├───────────────┬────────────────┐
- ▼               ▼                ▼
-Dashboard      Heatmap           Admin
-Analytics      Visualization     Moderation
- │               │                │
- └───────────────┴────────────────┘
-                 │
-                 ▼
-        Community Safety Awareness
+ ├───────────────┬─────────────────┐
+ ▼               ▼                 ▼
+Dashboard      Heatmap          Admin Review
+ │               │                 │
+ ▼               ▼                 ▼
+Statistics   Geographic       Moderation
+Trends       Patterns          & Management
+```
 
-Moderation
-🧰 Tech Stack
-Frontend
-React
+---
 
-TypeScript
+## ⚠️ Limitations
 
-Vite
+SafeVoice is currently a production-style project with several limitations:
 
-Tailwind CSS
+* SOS events are recorded by the application but do not automatically dispatch emergency services.
+* Safety insights depend on the quality and quantity of submitted reports.
+* Reports without coordinates cannot be displayed on the geographic visualization.
+* The current system does not implement advanced predictive risk modelling.
+* External authority and emergency-service integrations are not connected.
+* Anonymous reporting does not guarantee absolute anonymity at every infrastructure layer.
+* Large-scale deployment would require additional security, privacy, reliability, and compliance auditing.
+* Geographic patterns may be misleading when report volume is low or reporting behavior is uneven across locations.
 
-Framer Motion
+---
 
-Lucide React
+## 🔮 Future Improvements
 
-Backend & Data
-Supabase
+Potential extensions include:
 
-PostgreSQL
+* 🤖 Predictive safety-risk modelling
+* 🔔 Real-time community alerts
+* ✅ Report verification mechanisms
+* 🌐 Multilingual reporting
+* 🗺️ Safe-route recommendations
+* 📍 Advanced geospatial analytics
+* 📱 Dedicated mobile application
+* 🔐 Privacy-preserving analytics
+* 🏛️ Integration with verified civic services
+* 🧠 AI-assisted incident classification
+* 🔎 Advanced pattern detection
+* 📈 Time-based risk forecasting
 
-Supabase Authentication
+---
 
-Supabase Row Level Security (RLS)
+## 🎓 Project Focus
 
-Visualization
-Interactive geographic visualization
+SafeVoice explores how modern web technologies, structured incident reporting, geographic visualization, authentication, database security, and data-driven analytics can be combined to create more privacy-conscious community safety tools.
 
-Location-based incident markers
+### Core Concept
 
-Dashboard analytics
-
-Deployment
-Vercel
-
-GitHub
-
-🔒 Security
-SafeVoice uses Supabase Row Level Security to protect database operations.
-
-Security measures include:
-
-authenticated administrator access
-
-administrator-specific database policies
-
-anonymous SOS event insertion
-
-restricted administrator report updates
-
-restricted safety alert creation and modification
-
-environment variables for Supabase configuration
-
-.env excluded from version control
-
-The frontend uses the Supabase public anonymous key. Server-side service-role credentials are not included in the frontend application.
-
-📊 Application Modules
-Landing Page
-Project introduction
-
-Safety-focused messaging
-
-Feature overview
-
-Navigation to application modules
-
-Dashboard
-Safety statistics
-
-Incident trends
-
-Category information
-
-Recent reports
-
-Safety alerts
-
+```text
+Privacy
+   ↓
 Anonymous Reporting
-Multi-step report workflow
-
-Incident category
-
-Severity selection
-
-Description
-
-Location handling
-
-Database submission
-
-Heatmap
-Interactive geographic visualization
-
-Incident locations
-
-Safety-related markers
-
-Location-based exploration
-
-SOS
-Emergency interface
-
-Countdown workflow
-
-Location handling
-
-SOS event recording
-
-Admin
-Authenticated administrator login
-
-Report moderation
-
-Report status management
-
-Safety alert management
-
-Settings
-Application settings interface
-
-User-facing configuration options
-
-Help
-Platform guidance
-
-Feature explanations
-
-Safety-oriented information
-
-🖼️ Screenshots
-Landing Page
-
-
-Dashboard
-
-
-Heatmap
-
-
-Incident Reporting
-
-
-SOS
-
-
-⚙️ Local Development
-1. Clone the repository
-git clone https://github.com/rakshachahar/anonymous-safety-intelligence-system.git
-cd anonymous-safety-intelligence-system
-2. Install dependencies
-npm install
-3. Configure environment variables
-Create a .env file in the project root:
-
-VITE_SUPABASE_URL=your_supabase_project_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-Do not commit the .env file to Git.
-
-4. Start the development server
-npm run dev
-5. Run production checks
-npm run lint
-npm run typecheck
-npm run build
-🚀 Deployment
-SafeVoice is deployed using Vercel.
-
-Production URL:
-
-https://anonymous-safety-intelligence-syste.vercel.app
-
-Production Configuration
-Framework: Vite
-Build Command: npm run build
-Output Directory: dist
-Install Command: npm install
-The following environment variables must be configured in the deployment platform:
-
-VITE_SUPABASE_URL
-VITE_SUPABASE_ANON_KEY
-⚠️ Current Limitations
-SafeVoice is a production-style prototype and should not be treated as a replacement for official emergency or law-enforcement systems.
-
-Current limitations include:
-
-AI-assisted analysis is intended as decision-support functionality
-
-SOS events are recorded by the application and do not automatically dispatch emergency services
-
-emergency response integrations are not connected to external authorities
-
-advanced predictive risk modeling is not yet implemented
-
-safe route optimization is not implemented as a production navigation service
-
-further security auditing would be required before operating at large real-world scale
-
-real-time notification infrastructure is not currently integrated
-
-🔮 Future Scope
-Potential future improvements include:
-
-predictive safety risk modeling
-
-real-time safety alerts
-
-community report verification
-
-verified authority integrations
-
-safe route recommendations
-
-multilingual accessibility
-
-advanced geospatial analytics
-
-mobile application support
-
-privacy-preserving analytics
-
-real-time notification infrastructure
-
-advanced AI-powered pattern detection
-
-📌 Example Use Case
-Scenario
-A user experiences repeated harassment near a public transportation area during late evening hours.
-
-Platform Response
-The user submits an anonymous report.
-
-The incident is categorized and assigned a severity level.
-
-Location information is stored when available.
-
-The report becomes available for safety analytics.
-
-The location can contribute to geographic safety visualization.
-
-Administrators can review and moderate the report.
-
-Aggregated information can help identify recurring safety patterns.
-
-The system is intended to improve awareness and support community-level safety intelligence rather than replace official emergency response systems.
-
-❤️ Mission
-SafeVoice aims to make anonymous safety reports more visible and useful by transforming individual experiences into community-level safety intelligence.
-
-The project focuses on:
-
-Privacy → Reporting → Intelligence → Awareness → Prevention
-
-👩‍💻 Author
-Raksha Chahar
+   ↓
+Structured Data
+   ↓
+Safety Intelligence
+   ↓
+Community Awareness
+```
+
+---
+
+## 👩‍💻 Author
+
+**Raksha Chahar**
 
 B.Tech AI/ML Engineering Student
 
-GitHub:
+**GitHub:**
 https://github.com/rakshachahar
 
-Repository:
+**Repository:**
 https://github.com/rakshachahar/anonymous-safety-intelligence-system
+
+---
+
+## 📄 License
+
+This project is available for educational and development purposes.
+
+The repository includes an MIT License.
